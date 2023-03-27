@@ -27,6 +27,13 @@
             "Intraset\\LaravelScoutDatabaseDriver\\": "src/"
         }
     },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Intraset\\LaravelScoutDatabaseDriver\\ServiceProvider"
+            ]
+        }
+    },
     "minimum-stability": "dev",
     "prefer-stable": true
 }
