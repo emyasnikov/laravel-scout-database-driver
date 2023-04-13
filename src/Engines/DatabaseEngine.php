@@ -2,13 +2,35 @@
 
 namespace Intraset\LaravelScoutDatabaseDriver\Engines;
 
+use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
+use Laravel\Scout\Jobs\RemoveableScoutCollection;
 
 class DatabaseEngine extends Engine
 {
+    /**
+     * Determines if soft deletes for Scout are enabled or not.
+     *
+     * @var bool
+     */
+    protected $softDelete;
+
+    /**
+     * Create a new engine instance.
+     *
+     * @param  \Algolia\AlgoliaSearch\SearchClient  $algolia
+     * @param  bool  $softDelete
+     * @return void
+     */
+    public function __construct($softDelete = false)
+    {
+        $this->softDelete = $softDelete;
+    }
+
     /**
      * Update the given model in the index.
      *
@@ -17,7 +39,29 @@ class DatabaseEngine extends Engine
      */
     public function update($models)
     {
-        //
+        if ($models->isEmpty()) {
+            return;
+        }
+
+        if ($this->usesSoftDelete($models->first()) && $this->softDelete) {
+            $models->each->pushSoftDeleteMetadata();
+        }
+
+        $objects = $models->map(function ($model) {
+            if (empty($searchableData = $model->toSearchableArray())) {
+                return;
+            }
+
+            return array_merge(
+                $searchableData,
+                $model->scoutMetadata(),
+                ['objectID' => $model->getScoutKey()],
+            );
+        })->filter()->values()->all();
+
+        if (!empty($objects)) {
+            //
+        }
     }
 
     /**
@@ -28,6 +72,14 @@ class DatabaseEngine extends Engine
      */
     public function delete($models)
     {
+        if ($models->isEmpty()) {
+            return;
+        }
+
+        $keys = $models instanceof RemovableScoutCollection
+            ? $models->pluck($models->first()->getScoutKeyName())
+            : $models->map->getScoutKey();
+
         //
     }
 
@@ -39,7 +91,10 @@ class DatabaseEngine extends Engine
      */
     public function search(Builder $builder)
     {
-        return [];
+        return $this->performSearch($builder, array_filter([
+            'numericFilters' => $this->filters($builder),
+            'hitsPerPage' => $builder->limit,
+        ]));
     }
 
     /**
@@ -52,7 +107,52 @@ class DatabaseEngine extends Engine
      */
     public function paginate(Builder $builder, $perPage, $page)
     {
-        return [];
+        return $this->performSearch($builder, array_filter([
+            'numericFilters' => $this->filters($builder),
+            'hitsPerPage' => $perPage,
+            'page' => $page - 1,
+        ]));
+    }
+
+    /**
+     * Perform the given search on the engine.
+     *
+     * @param  \Laravel\Scout\Builder  $builder
+     * @param  array  $options
+     * @return mixed
+     */
+    protected function performSearch(Builder $builder, array $options = [])
+    {
+        $options = array_merge($builder->options, $options);
+
+        if ($builder->callback) {
+            return call_user_func(
+                $builder->callback,
+                $builder->query,
+                $options
+            );
+        }
+
+        //
+    }
+
+    /**
+     * Get the filter array for the query.
+     *
+     * @param  \Laravel\Scout\Builder  $builder
+     * @return array
+     */
+    protected function filters(Builder $builder)
+    {
+        $wheres = collect($builder->wheres)->map(function ($value, $key) {
+            return $key.' = '.$value;
+        })->values();
+
+        return $wheres->merge(collect($builder->whereIns)->map(function ($values, $key) {
+            return collect($values)->map(function ($value) use ($key) {
+                return $key.' = '.$value;
+            })->all();
+        })->values())->values()->all();
     }
 
     /**
@@ -63,7 +163,7 @@ class DatabaseEngine extends Engine
      */
     public function mapIds($results)
     {
-        return BaseCollection::make();
+        return collect($results['hits'])->pluck('objectID')->values();
     }
 
     /**
@@ -76,7 +176,21 @@ class DatabaseEngine extends Engine
      */
     public function map(Builder $builder, $results, $model)
     {
-        return Collection::make();
+        if (count($results['hits']) === 0) {
+            return $model->newCollection();
+        }
+
+        $objectIds = collect($results['hits'])->pluck('objectID')->values()->all();
+
+        $objectIdPositions = array_flip($objectIds);
+
+        return $model->getScoutModelsByIds(
+            $builder, $objectIds
+        )->filter(function ($model) use ($objectIds) {
+            return in_array($model->getScoutKey(), $objectIds);
+        })->sortBy(function ($model) use ($objectIdPositions) {
+            return $objectIdPositions[$model->getScoutKey()];
+        })->values();
     }
 
     /**
@@ -89,7 +203,20 @@ class DatabaseEngine extends Engine
      */
     public function lazyMap(Builder $builder, $results, $model)
     {
-        return LazyCollection::make();
+        if (count($results['hits']) === 0) {
+            return LazyCollection::make($model->newCollection());
+        }
+
+        $objectIds = collect($results['hits'])->pluck('objectID')->values()->all();
+        $objectIdPositions = array_flip($objectIds);
+
+        return $model->queryScoutModelsByIds(
+            $builder, $objectIds
+        )->cursor()->filter(function ($model) use ($objectIds) {
+            return in_array($model->getScoutKey(), $objectIds);
+        })->sortBy(function ($model) use ($objectIdPositions) {
+            return $objectIdPositions[$model->getScoutKey()];
+        })->values();
     }
 
     /**
@@ -100,7 +227,7 @@ class DatabaseEngine extends Engine
      */
     public function getTotalCount($results)
     {
-        return count($results);
+        return $results['nbHits'];
     }
 
     /**
@@ -123,7 +250,7 @@ class DatabaseEngine extends Engine
      */
     public function createIndex($name, array $options = [])
     {
-        return [];
+        //
     }
 
     /**
@@ -134,6 +261,17 @@ class DatabaseEngine extends Engine
      */
     public function deleteIndex($name)
     {
-        return [];
+        //
+    }
+
+    /**
+     * Determine if the given model uses soft deletes.
+     *
+     * @param  \Illuminate\Database\Eloquent\Model  $model
+     * @return bool
+     */
+    protected function usesSoftDelete($model)
+    {
+        return in_array(SoftDeletes::class, class_uses_recursive($model));
     }
 }
