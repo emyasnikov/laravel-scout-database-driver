@@ -6,6 +6,6 @@
 - [x] Add `README.md` file
 - [x] Add `LICENSE.md` file
 - [x] Add `TODO.md` file
-- [ ] Add `CHANGELOG.md` file
+- [X] Add `CHANGELOG.md` file
 - [ ] Add `CONTRIBUTING.md` file
 - [ ] Add about command
