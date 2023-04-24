@@ -1,0 +1,39 @@
+{
+    "name": "intraset/laravel-scout-database-driver",
+    "description": "Database driver for Laravel Scout",
+    "keywords": [
+        "laravel",
+        "scout",
+        "search",
+        "database"
+    ],
+    "homepage": "https://github.com/intraset/laravel-scout-database-driver",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Evgenij Myasnikov",
+            "email": "evgenij.myasnikov@gmail.com",
+            "homepage": "https://github.com/emyasnikov"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "illuminate/database": "^9.0|^10.0",
+        "illuminate/support": "^9.0|^10.0",
+        "laravel/scout": "^9.0|^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Intraset\\LaravelScoutDatabaseDriver\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Intraset\\LaravelScoutDatabaseDriver\\ServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
