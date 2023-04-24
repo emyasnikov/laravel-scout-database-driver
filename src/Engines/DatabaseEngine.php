@@ -9,6 +9,7 @@ use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\LazyCollection;
 use Laravel\Scout\Builder;
 use Laravel\Scout\Jobs\RemoveableScoutCollection;
+use Models\Index;
 
 class DatabaseEngine extends Engine
 {
@@ -22,7 +23,6 @@ class DatabaseEngine extends Engine
     /**
      * Create a new engine instance.
      *
-     * @param  \Algolia\AlgoliaSearch\SearchClient  $algolia
      * @param  bool  $softDelete
      * @return void
      */
@@ -55,13 +55,38 @@ class DatabaseEngine extends Engine
             return array_merge(
                 $searchableData,
                 $model->scoutMetadata(),
-                ['objectID' => $model->getScoutKey()],
+                [
+                    'model_id' => $model->getScoutKey(),
+                    'model_type' => $model->getMorphClass(),
+                ],
             );
         })->filter()->values()->all();
 
         if (!empty($objects)) {
-            //
+            foreach ($objects as $object) {
+                $this->insert($object);
+            }
         }
+    }
+
+    /**
+     * Insert the given model to the index.
+     *
+     * @param  Intraset\LaravelScoutDatabaseDriver\Model  $model
+     * @return void
+     */
+    public function insert($model)
+    {
+        $index = [
+            'model_id' => $model['model_id'],
+            'model_type' => $model['model_type'],
+        ];
+
+        Index::firstOrNew($index)->fill(array_merge($index, [
+            'value' => collect($model)->filter(function ($value, $key) {
+                return !in_array($key, ['model_id', 'model_type']);
+            })->values()->flatten()->implode(' '))),
+        ])->save();
     }
 
     /**
@@ -80,7 +105,9 @@ class DatabaseEngine extends Engine
             ? $models->pluck($models->first()->getScoutKeyName())
             : $models->map->getScoutKey();
 
-        //
+        foreach ($keys as $key) {
+            Index::where('model_id', $key)->delete();
+        }
     }
 
     /**
@@ -133,7 +160,15 @@ class DatabaseEngine extends Engine
             );
         }
 
-        //
+        $result = Index::where('value', 'like', '%'.$builder->query.'%')->get();
+
+        $result['hits'] = $result->map(function ($item) {
+            return ['objectID' => $item['model_id'];
+        })->all();
+
+        $result['nbHits'] = $result->count();
+
+        return $result;
     }
 
     /**
@@ -238,7 +273,7 @@ class DatabaseEngine extends Engine
      */
     public function flush($model)
     {
-        //
+        Index:truncate();
     }
 
     /**
