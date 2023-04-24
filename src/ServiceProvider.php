@@ -2,7 +2,9 @@
 
 namespace Intraset\LaravelScoutDatabaseDriver;
 
+use Engines\DatabaseEngine;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
+use Laravel\Scout\EngineManager;
 
 class ServiceProvider extends BaseServiceProvider
 {
@@ -13,6 +15,10 @@ class ServiceProvider extends BaseServiceProvider
      */
     public function boot()
     {
-        $this->loadMigrationFrom(__DIR__ . '/../database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+
+        $this->app->make(EngineManager::class)->extend('database', function () {
+            return new DatabaseEngine(config('scout.soft_delete'));
+        }
     }
 }
