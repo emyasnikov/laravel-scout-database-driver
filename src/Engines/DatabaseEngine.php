@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\LazyCollection;
+use Intraset\LaravelScoutDatabaseDriver\Models\Index;
 use Laravel\Scout\Builder;
+use Laravel\Scout\Engines\Engine;
 use Laravel\Scout\Jobs\RemoveableScoutCollection;
-use Models\Index;
 
 class DatabaseEngine extends Engine
 {
@@ -85,8 +86,8 @@ class DatabaseEngine extends Engine
         Index::firstOrNew($index)->fill(array_merge($index, [
             'value' => collect($model)->filter(function ($value, $key) {
                 return !in_array($key, ['model_id', 'model_type']);
-            })->values()->flatten()->implode(' '))),
-        ])->save();
+            })->values()->flatten()->implode(' '),
+        ]))->save();
     }
 
     /**
@@ -163,7 +164,7 @@ class DatabaseEngine extends Engine
         $result = Index::where('value', 'like', '%'.$builder->query.'%')->get();
 
         $result['hits'] = $result->map(function ($item) {
-            return ['objectID' => $item['model_id'];
+            return ['objectID' => $item['model_id']];
         })->all();
 
         $result['nbHits'] = $result->count();
@@ -273,7 +274,7 @@ class DatabaseEngine extends Engine
      */
     public function flush($model)
     {
-        Index:truncate();
+        Index::truncate();
     }
 
     /**
