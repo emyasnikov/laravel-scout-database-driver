@@ -22,7 +22,7 @@ class Index extends Model
      *
      * @var string
      */
-    protected $table = 'index';
+    protected $table = 'indexes';
 
     /**
      * Related model.
