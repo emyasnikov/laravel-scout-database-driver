@@ -15,5 +15,5 @@
 ## Fix
 
 - [ ] Updating index settings
-- [ ] Drivers name conflicts with default driver
+- [x] Drivers name conflicts with default driver
 - [ ] Migrations name is outdated

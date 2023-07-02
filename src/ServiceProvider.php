@@ -17,7 +17,7 @@ class ServiceProvider extends BaseServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 
-        $this->app->make(EngineManager::class)->extend('database', function () {
+        $this->app->make(EngineManager::class)->extend('database_table', function () {
             return new DatabaseEngine(config('scout.soft_delete'));
         });
     }

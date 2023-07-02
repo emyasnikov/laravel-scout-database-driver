@@ -8,8 +8,17 @@ Database driver for Laravel Scout.
 
 ## Installation
 
+Run following command to install package:
+
 ```bash
 composer require intraset/laravel-scout-database-driver
+```
+
+Put following to your .env file:
+
+```dotenv
+SCOUT_DRIVER=database_table
+SCOUT_QUEUE=true
 ```
 
 ## Credits
